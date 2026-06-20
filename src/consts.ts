@@ -4,11 +4,11 @@
 
 export const SITE_TITLE = "Harshwardhan Singh";
 export const SITE_DESCRIPTION =
-	"Notes on AI, security, and web performance — by Harshwardhan Singh.";
+	"Harshwardhan Singh — web engineer writing about web performance, frontend architecture, AI, and security.";
 
 // Short line shown under your name on the home page.
 export const SITE_TAGLINE =
-	"I write about AI, cybersecurity, and web performance.";
+	"Web engineer. I write about performance, frontend architecture, and what I'm learning in AI and security.";
 
 export const AUTHOR = "Harshwardhan Singh";
 

@@ -1,20 +1,15 @@
 ---
 import HeaderLink from "./HeaderLink.astro";
 import ThemeToggle from "./ThemeToggle.astro";
-import { SITE_TITLE, NAV_LINKS } from "../consts";
-
-// On the home page the big <h1> already shows the name, so hide the
-// header brand there to avoid repeating it.
-const isHome = Astro.url.pathname === "/";
+import { NAV_LINKS } from "../consts";
 ---
 
 <header>
-	<div class:list={["inner", { "no-brand": isHome }]}>
-		{!isHome && <a href="/" class="brand">{SITE_TITLE}</a>}
+	<div class="inner">
 		<nav>
 			{NAV_LINKS.map((l) => <HeaderLink href={l.href}>{l.label}</HeaderLink>)}
-			<ThemeToggle />
 		</nav>
+		<ThemeToggle />
 	</div>
 </header>
 
@@ -36,19 +31,6 @@ const isHome = Astro.url.pathname === "/";
 		align-items: center;
 		justify-content: space-between;
 		gap: 1rem;
-	}
-	.inner.no-brand {
-		justify-content: flex-end;
-	}
-	.brand {
-		font-weight: 650;
-		letter-spacing: -0.02em;
-		color: var(--text);
-		font-size: 1rem;
-	}
-	.brand:hover {
-		color: var(--accent);
-		text-decoration: none;
 	}
 	nav {
 		display: flex;
