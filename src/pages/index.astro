@@ -1,50 +1,99 @@
 ---
-import BaseHead from '../components/BaseHead.astro';
-import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
-import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PostList from "../components/PostList.astro";
+import Socials from "../components/Socials.astro";
+import { getCollection } from "astro:content";
+import { SITE_TITLE, SITE_TAGLINE } from "../consts";
+
+const posts = (await getCollection("blog"))
+	.filter((p) => !p.data.draft)
+	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+const recent = posts.slice(0, 5);
 ---
 
-<!doctype html>
-<html lang="en">
-	<head>
-		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
-	</head>
-	<body>
-		<Header />
-		<main>
-			<h1>🧑‍🚀 Hello, Astronaut!</h1>
-			<p>
-				Welcome to the official <a href="https://astro.build/">Astro</a> blog starter template. This
-				template serves as a lightweight, minimally-styled starting point for anyone looking to build
-				a personal website, blog, or portfolio with Astro.
-			</p>
-			<p>
-				This template comes with a few integrations already configured in your
-				<code>astro.config.mjs</code> file. You can customize your setup with
-				<a href="https://astro.build/integrations">Astro Integrations</a> to add tools like Tailwind,
-				React, or Vue to your project.
-			</p>
-			<p>Here are a few ideas on how to get started with the template:</p>
-			<ul>
-				<li>Edit this page in <code>src/pages/index.astro</code></li>
-				<li>Edit the site header items in <code>src/components/Header.astro</code></li>
-				<li>Add your name to the footer in <code>src/components/Footer.astro</code></li>
-				<li>Check out the included blog posts in <code>src/content/blog/</code></li>
-				<li>Customize the blog post page layout in <code>src/layouts/BlogPost.astro</code></li>
-			</ul>
-			<p>
-				Have fun! If you get stuck, remember to <a href="https://docs.astro.build/"
-					>read the docs
-				</a> or <a href="https://astro.build/chat">join us on Discord</a> to ask questions.
-			</p>
-			<p>
-				Looking for a blog template with a bit more personality? Check out <a
-					href="https://github.com/Charca/astro-blog-template"
-					>astro-blog-template
-				</a> by <a href="https://twitter.com/Charca">Maxi Ferreira</a>.
-			</p>
-		</main>
-		<Footer />
-	</body>
-</html>
+<BaseLayout>
+	<section class="intro">
+		<p class="eyebrow">Personal site &amp; blog</p>
+		<h1>{SITE_TITLE}</h1>
+		<p class="tagline">{SITE_TAGLINE}</p>
+		<Socials />
+	</section>
+
+	<section class="bio prose">
+		<!-- TODO: Replace this with your own story. -->
+		<p>
+			I work at the intersection of <strong>AI</strong>,
+			<strong>cybersecurity</strong>, and <strong>web performance</strong> — and
+			this is where I think out loud about all three. Part notebook, part
+			portfolio: I write things down so I don't have to figure them out twice,
+			and share the ones that might be useful to someone else.
+		</p>
+		<ul>
+			<li><strong>AI</strong> — practical use, model behavior, and tooling.</li>
+			<li>
+				<strong>Security</strong> — applied appsec, threat modeling, and notes
+				from hands-on work.
+			</li>
+			<li>
+				<strong>Web performance</strong> — making the web fast: rendering, the
+				network, and Core Web Vitals.
+			</li>
+		</ul>
+	</section>
+
+	<section class="writing">
+		<div class="section-head">
+			<h2>Writing</h2>
+			{posts.length > recent.length && <a href="/blog" class="mono more">All posts →</a>}
+		</div>
+		{
+			recent.length > 0 ? (
+				<PostList posts={recent} />
+			) : (
+				<p class="muted">No posts yet — your first one is coming soon.</p>
+			)
+		}
+	</section>
+</BaseLayout>
+
+<style>
+	.intro {
+		padding: 1rem 0 2.5rem;
+	}
+	.intro h1 {
+		font-size: 2.6rem;
+		margin: 0.5rem 0 0.6rem;
+	}
+	.tagline {
+		font-size: 1.15rem;
+		color: var(--text-muted);
+		max-width: 34rem;
+		margin-bottom: 1.5rem;
+	}
+	.bio {
+		margin-bottom: 3rem;
+	}
+	.section-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		margin-bottom: 0.25rem;
+	}
+	.section-head h2 {
+		font-size: 1.2rem;
+		margin: 0;
+	}
+	.more {
+		font-size: 0.82rem;
+		color: var(--text-muted);
+	}
+	.more:hover {
+		color: var(--accent);
+	}
+	@media (max-width: 640px) {
+		.intro h1 {
+			font-size: 2.1rem;
+		}
+	}
+</style>
