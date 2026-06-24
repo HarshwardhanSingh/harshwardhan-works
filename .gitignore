@@ -200,3 +200,7 @@ dist
 
 ### Astro ###
 .astro/
+
+# Generated narration audio (regenerate with `npm run audio`)
+public/audio/*.mp3
+scripts/.audio-cache.json

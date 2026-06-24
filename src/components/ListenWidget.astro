@@ -1,15 +1,16 @@
 ---
 // Read-aloud widget for blog posts.
 //
-// Two modes, chosen at runtime:
+// One consistent, themed control drives both playback modes:
 //   1. If a pre-generated MP3 exists at `audioSrc` (probed with a HEAD request),
-//      render a native <audio> player — the "podcast" upgrade path. Just drop a
-//      file at public/audio/<slug>.mp3 and this lights up automatically.
-//   2. Otherwise fall back to the browser's built-in speech synthesis, reading
-//      the rendered article text (code blocks, tables, and nav/checkpoint
+//      the control plays that audio (the "podcast" narration). A slim progress
+//      bar appears. Drop a file at public/audio/<slug>.mp3 and this lights up.
+//   2. Otherwise it falls back to the browser's built-in speech synthesis,
+//      reading the rendered article text (code, tables, and nav/checkpoint
 //      callouts stripped).
 //
-// If neither is available, the widget removes itself.
+// The <audio> element is headless (no native controls) so the UI stays the
+// same in either mode. If neither mode is available, the widget hides itself.
 interface Props {
 	audioSrc?: string;
 }
@@ -17,7 +18,7 @@ const { audioSrc } = Astro.props;
 ---
 
 <div class="listen" data-listen-widget data-audio-src={audioSrc ?? ""}>
-	<div class="listen-row" data-speech>
+	<div class="listen-row">
 		<button
 			type="button"
 			class="listen-btn"
@@ -31,49 +32,92 @@ const { audioSrc } = Astro.props;
 		<button type="button" class="listen-speed" data-speed aria-label="Playback speed"
 			>1×</button
 		>
-		<span class="listen-note mono">read aloud in your browser</span>
+		<span class="listen-note mono" data-note>read aloud in your browser</span>
 	</div>
-	<audio class="listen-audio" data-audio controls preload="none" hidden></audio>
+	<div class="listen-progress" data-progress hidden>
+		<div class="listen-progress-fill" data-fill></div>
+	</div>
+	<audio class="listen-audio" data-audio preload="none" hidden></audio>
 </div>
 
 <script>
 	type Mode = "idle" | "playing" | "paused";
+	const SPEEDS = [1, 1.25, 1.5, 0.75];
 
 	function initListenWidget() {
 		const el = document.querySelector<HTMLElement>("[data-listen-widget]");
 		if (!el) return;
 
-		const speechRow = el.querySelector<HTMLElement>("[data-speech]")!;
 		const audioEl = el.querySelector<HTMLAudioElement>("[data-audio]")!;
 		const toggleBtn = el.querySelector<HTMLButtonElement>("[data-toggle]")!;
 		const speedBtn = el.querySelector<HTMLButtonElement>("[data-speed]")!;
 		const labelEl = el.querySelector<HTMLElement>("[data-label]")!;
 		const icoEl = el.querySelector<HTMLElement>("[data-ico]")!;
+		const noteEl = el.querySelector<HTMLElement>("[data-note]")!;
+		const progressEl = el.querySelector<HTMLElement>("[data-progress]")!;
+		const fillEl = el.querySelector<HTMLElement>("[data-fill]")!;
 
-		// --- Upgrade path: prefer a pre-generated MP3 if one is present. ---
+		let speedIdx = 0;
+		const setSpeedLabel = () => (speedBtn.textContent = `${SPEEDS[speedIdx]}×`);
+
+		// --- Prefer a pre-generated MP3 if one is present. -----------------------
 		const src = el.dataset.audioSrc;
 		if (src) {
 			fetch(src, { method: "HEAD" })
-				.then((r) => {
-					if (r.ok) {
-						audioEl.src = src;
-						audioEl.hidden = false;
-						speechRow.hidden = true;
-					}
-				})
+				.then((r) => r.ok && setupAudioMode(src))
 				.catch(() => {
-					/* no MP3 yet — stay in speech mode */
+					/* no MP3 — speech mode stays */
 				});
 		}
 
-		// --- Speech-synthesis fallback. ---
+		// ========================================================================
+		// Mode A: pre-generated narration audio.
+		// ========================================================================
+		function setupAudioMode(url: string) {
+			audioEl.src = url;
+			noteEl.hidden = true;
+			progressEl.hidden = false;
+
+			const sync = () => {
+				const playing = !audioEl.paused && !audioEl.ended;
+				icoEl.textContent = playing ? "⏸" : "▶";
+				labelEl.textContent = playing
+					? "Pause"
+					: audioEl.currentTime > 0 && !audioEl.ended
+						? "Resume"
+						: "Listen";
+				toggleBtn.setAttribute("aria-pressed", String(playing));
+			};
+
+			audioEl.addEventListener("play", sync);
+			audioEl.addEventListener("pause", sync);
+			audioEl.addEventListener("ended", () => {
+				fillEl.style.width = "0%";
+				sync();
+			});
+			audioEl.addEventListener("timeupdate", () => {
+				if (audioEl.duration > 0) {
+					fillEl.style.width = `${(audioEl.currentTime / audioEl.duration) * 100}%`;
+				}
+			});
+
+			toggleBtn.onclick = () => (audioEl.paused ? audioEl.play() : audioEl.pause());
+			speedBtn.onclick = () => {
+				speedIdx = (speedIdx + 1) % SPEEDS.length;
+				audioEl.playbackRate = SPEEDS[speedIdx];
+				setSpeedLabel();
+			};
+		}
+
+		// ========================================================================
+		// Mode B: browser speech-synthesis fallback.
+		// ========================================================================
 		const synth = window.speechSynthesis;
-		if (!synth) {
-			// No MP3 will arrive synchronously and no speech support: hide controls.
-			speechRow.hidden = true;
-			// If the async probe later reveals an MP3 it will still un-hide the audio.
+		if (!synth && !src) {
+			el.hidden = true;
 			return;
 		}
+		if (!synth) return; // audio probe may still light up Mode A
 
 		let voice: SpeechSynthesisVoice | null = null;
 		const pickVoice = () => {
@@ -87,37 +131,28 @@ const { audioSrc } = Astro.props;
 		pickVoice();
 		synth.addEventListener("voiceschanged", pickVoice);
 
-		const SPEEDS = [1, 1.25, 1.5, 0.75];
-		let speedIdx = 0;
-		let rate = SPEEDS[speedIdx];
-
 		let chunks: string[] = [];
 		let idx = 0;
 		let mode: Mode = "idle";
-		// Guards against a cancelled utterance's onend advancing the queue.
 		let token = 0;
 
 		function readableText(): string {
 			const prose = document.querySelector(".prose");
 			if (!prose) return "";
 			const clone = prose.cloneNode(true) as HTMLElement;
-			// Code, tables, and explicit opt-outs read terribly aloud.
 			clone.querySelectorAll("pre, table, .listen-skip").forEach((n) => n.remove());
-			// Drop the series-nav and checkpoint callouts.
 			clone.querySelectorAll("blockquote").forEach((bq) => {
 				if (/build-in-public series|you are here|checkpoint/i.test(bq.textContent || ""))
 					bq.remove();
 			});
 			const title =
 				document.querySelector<HTMLElement>(".post-header h1")?.innerText.trim() ?? "";
-			const body = clone.innerText;
-			return (title ? title + ". " : "") + body;
+			return (title ? title + ". " : "") + clone.innerText;
 		}
 
 		function chunkText(text: string): string[] {
 			const clean = text.replace(/\s+/g, " ").trim();
 			if (!clean) return [];
-			// Short utterances sidestep the long-text cutoff bug in some engines.
 			const sentences = clean.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [clean];
 			const out: string[] = [];
 			let buf = "";
@@ -148,7 +183,7 @@ const { audioSrc } = Astro.props;
 			}
 			const myToken = token;
 			const u = new SpeechSynthesisUtterance(chunks[idx]);
-			u.rate = rate;
+			u.rate = SPEEDS[speedIdx];
 			if (voice) u.voice = voice;
 			u.onend = () => {
 				if (myToken !== token || mode !== "playing") return;
@@ -176,10 +211,9 @@ const { audioSrc } = Astro.props;
 			setUI();
 		}
 
-		toggleBtn.addEventListener("click", () => {
-			if (mode === "idle") {
-				start();
-			} else if (mode === "playing") {
+		toggleBtn.onclick = () => {
+			if (mode === "idle") start();
+			else if (mode === "playing") {
 				synth.pause();
 				mode = "paused";
 				setUI();
@@ -188,21 +222,18 @@ const { audioSrc } = Astro.props;
 				mode = "playing";
 				setUI();
 			}
-		});
+		};
 
-		speedBtn.addEventListener("click", () => {
+		speedBtn.onclick = () => {
 			speedIdx = (speedIdx + 1) % SPEEDS.length;
-			rate = SPEEDS[speedIdx];
-			speedBtn.textContent = `${rate}×`;
-			// Re-speak the current chunk at the new rate; the stale onend is ignored.
+			setSpeedLabel();
 			if (mode === "playing") {
 				token += 1;
 				synth.cancel();
 				speakCurrent();
 			}
-		});
+		};
 
-		// Don't keep talking after the visitor leaves the page.
 		const cancel = () => synth.cancel();
 		window.addEventListener("pagehide", cancel);
 		window.addEventListener("beforeunload", cancel);
@@ -264,9 +295,18 @@ const { audioSrc } = Astro.props;
 		font-size: 0.72rem;
 		color: var(--text-muted);
 	}
-	.listen-audio {
-		width: 100%;
-		max-width: 28rem;
+	.listen-progress {
+		height: 3px;
+		margin-top: 0.7rem;
+		background: var(--border);
+		border-radius: 999px;
+		overflow: hidden;
+	}
+	.listen-progress-fill {
+		height: 100%;
+		width: 0;
+		background: var(--accent);
+		transition: width 0.2s linear;
 	}
 	@media (max-width: 640px) {
 		.listen-note {
