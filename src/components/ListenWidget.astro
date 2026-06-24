@@ -1,0 +1,276 @@
+---
+// Read-aloud widget for blog posts.
+//
+// Two modes, chosen at runtime:
+//   1. If a pre-generated MP3 exists at `audioSrc` (probed with a HEAD request),
+//      render a native <audio> player — the "podcast" upgrade path. Just drop a
+//      file at public/audio/<slug>.mp3 and this lights up automatically.
+//   2. Otherwise fall back to the browser's built-in speech synthesis, reading
+//      the rendered article text (code blocks, tables, and nav/checkpoint
+//      callouts stripped).
+//
+// If neither is available, the widget removes itself.
+interface Props {
+	audioSrc?: string;
+}
+const { audioSrc } = Astro.props;
+---
+
+<div class="listen" data-listen-widget data-audio-src={audioSrc ?? ""}>
+	<div class="listen-row" data-speech>
+		<button
+			type="button"
+			class="listen-btn"
+			data-toggle
+			aria-label="Listen to this post"
+			aria-pressed="false"
+		>
+			<span class="ico" data-ico aria-hidden="true">▶</span>
+			<span data-label>Listen</span>
+		</button>
+		<button type="button" class="listen-speed" data-speed aria-label="Playback speed"
+			>1×</button
+		>
+		<span class="listen-note mono">read aloud in your browser</span>
+	</div>
+	<audio class="listen-audio" data-audio controls preload="none" hidden></audio>
+</div>
+
+<script>
+	type Mode = "idle" | "playing" | "paused";
+
+	function initListenWidget() {
+		const el = document.querySelector<HTMLElement>("[data-listen-widget]");
+		if (!el) return;
+
+		const speechRow = el.querySelector<HTMLElement>("[data-speech]")!;
+		const audioEl = el.querySelector<HTMLAudioElement>("[data-audio]")!;
+		const toggleBtn = el.querySelector<HTMLButtonElement>("[data-toggle]")!;
+		const speedBtn = el.querySelector<HTMLButtonElement>("[data-speed]")!;
+		const labelEl = el.querySelector<HTMLElement>("[data-label]")!;
+		const icoEl = el.querySelector<HTMLElement>("[data-ico]")!;
+
+		// --- Upgrade path: prefer a pre-generated MP3 if one is present. ---
+		const src = el.dataset.audioSrc;
+		if (src) {
+			fetch(src, { method: "HEAD" })
+				.then((r) => {
+					if (r.ok) {
+						audioEl.src = src;
+						audioEl.hidden = false;
+						speechRow.hidden = true;
+					}
+				})
+				.catch(() => {
+					/* no MP3 yet — stay in speech mode */
+				});
+		}
+
+		// --- Speech-synthesis fallback. ---
+		const synth = window.speechSynthesis;
+		if (!synth) {
+			// No MP3 will arrive synchronously and no speech support: hide controls.
+			speechRow.hidden = true;
+			// If the async probe later reveals an MP3 it will still un-hide the audio.
+			return;
+		}
+
+		let voice: SpeechSynthesisVoice | null = null;
+		const pickVoice = () => {
+			const vs = synth.getVoices();
+			voice =
+				vs.find((v) => /^en[-_]?(US|GB|IN)/i.test(v.lang) && v.localService) ||
+				vs.find((v) => v.lang.toLowerCase().startsWith("en")) ||
+				vs[0] ||
+				null;
+		};
+		pickVoice();
+		synth.addEventListener("voiceschanged", pickVoice);
+
+		const SPEEDS = [1, 1.25, 1.5, 0.75];
+		let speedIdx = 0;
+		let rate = SPEEDS[speedIdx];
+
+		let chunks: string[] = [];
+		let idx = 0;
+		let mode: Mode = "idle";
+		// Guards against a cancelled utterance's onend advancing the queue.
+		let token = 0;
+
+		function readableText(): string {
+			const prose = document.querySelector(".prose");
+			if (!prose) return "";
+			const clone = prose.cloneNode(true) as HTMLElement;
+			// Code, tables, and explicit opt-outs read terribly aloud.
+			clone.querySelectorAll("pre, table, .listen-skip").forEach((n) => n.remove());
+			// Drop the series-nav and checkpoint callouts.
+			clone.querySelectorAll("blockquote").forEach((bq) => {
+				if (/build-in-public series|you are here|checkpoint/i.test(bq.textContent || ""))
+					bq.remove();
+			});
+			const title =
+				document.querySelector<HTMLElement>(".post-header h1")?.innerText.trim() ?? "";
+			const body = clone.innerText;
+			return (title ? title + ". " : "") + body;
+		}
+
+		function chunkText(text: string): string[] {
+			const clean = text.replace(/\s+/g, " ").trim();
+			if (!clean) return [];
+			// Short utterances sidestep the long-text cutoff bug in some engines.
+			const sentences = clean.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [clean];
+			const out: string[] = [];
+			let buf = "";
+			for (const s of sentences) {
+				if (buf && (buf + s).length > 220) {
+					out.push(buf.trim());
+					buf = "";
+				}
+				buf += s;
+			}
+			if (buf.trim()) out.push(buf.trim());
+			return out;
+		}
+
+		function setUI() {
+			const playing = mode === "playing";
+			icoEl.textContent = playing ? "⏸" : "▶";
+			labelEl.textContent =
+				mode === "playing" ? "Pause" : mode === "paused" ? "Resume" : "Listen";
+			toggleBtn.setAttribute("aria-pressed", String(mode !== "idle"));
+		}
+
+		function speakCurrent() {
+			if (mode !== "playing") return;
+			if (idx >= chunks.length) {
+				stop();
+				return;
+			}
+			const myToken = token;
+			const u = new SpeechSynthesisUtterance(chunks[idx]);
+			u.rate = rate;
+			if (voice) u.voice = voice;
+			u.onend = () => {
+				if (myToken !== token || mode !== "playing") return;
+				idx += 1;
+				speakCurrent();
+			};
+			synth.speak(u);
+		}
+
+		function start() {
+			chunks = chunkText(readableText());
+			if (chunks.length === 0) return;
+			synth.cancel();
+			idx = 0;
+			token += 1;
+			mode = "playing";
+			setUI();
+			speakCurrent();
+		}
+
+		function stop() {
+			token += 1;
+			synth.cancel();
+			mode = "idle";
+			setUI();
+		}
+
+		toggleBtn.addEventListener("click", () => {
+			if (mode === "idle") {
+				start();
+			} else if (mode === "playing") {
+				synth.pause();
+				mode = "paused";
+				setUI();
+			} else {
+				synth.resume();
+				mode = "playing";
+				setUI();
+			}
+		});
+
+		speedBtn.addEventListener("click", () => {
+			speedIdx = (speedIdx + 1) % SPEEDS.length;
+			rate = SPEEDS[speedIdx];
+			speedBtn.textContent = `${rate}×`;
+			// Re-speak the current chunk at the new rate; the stale onend is ignored.
+			if (mode === "playing") {
+				token += 1;
+				synth.cancel();
+				speakCurrent();
+			}
+		});
+
+		// Don't keep talking after the visitor leaves the page.
+		const cancel = () => synth.cancel();
+		window.addEventListener("pagehide", cancel);
+		window.addEventListener("beforeunload", cancel);
+	}
+
+	initListenWidget();
+</script>
+
+<style>
+	.listen {
+		margin: 0 0 2rem;
+	}
+	.listen-row {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+	}
+	.listen-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		color: var(--text);
+		background: var(--bg-subtle);
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		padding: 0.32rem 0.8rem;
+		cursor: pointer;
+		transition:
+			border-color 0.15s ease,
+			color 0.15s ease;
+	}
+	.listen-btn:hover {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+	.listen-btn .ico {
+		font-size: 0.7rem;
+		line-height: 1;
+	}
+	.listen-speed {
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		background: transparent;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		padding: 0.28rem 0.55rem;
+		cursor: pointer;
+		min-width: 2.6rem;
+	}
+	.listen-speed:hover {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+	.listen-note {
+		font-size: 0.72rem;
+		color: var(--text-muted);
+	}
+	.listen-audio {
+		width: 100%;
+		max-width: 28rem;
+	}
+	@media (max-width: 640px) {
+		.listen-note {
+			display: none;
+		}
+	}
+</style>

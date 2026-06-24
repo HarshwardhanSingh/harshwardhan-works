@@ -2,13 +2,23 @@
 import type { CollectionEntry } from "astro:content";
 import BaseLayout from "./BaseLayout.astro";
 import FormattedDate from "../components/FormattedDate.astro";
+import ListenWidget from "../components/ListenWidget.astro";
 
 type Props = CollectionEntry<"blog">["data"] & {
 	minutesRead?: string;
+	audioSrc?: string;
 };
 
-const { title, description, pubDate, updatedDate, heroImage, tags, minutesRead } =
-	Astro.props;
+const {
+	title,
+	description,
+	pubDate,
+	updatedDate,
+	heroImage,
+	tags,
+	minutesRead,
+	audioSrc,
+} = Astro.props;
 ---
 
 <BaseLayout title={title} description={description} image={heroImage}>
@@ -41,6 +51,8 @@ const { title, description, pubDate, updatedDate, heroImage, tags, minutesRead }
 				<img class="hero" src={heroImage} alt="" width={1200} height={630} />
 			)
 		}
+
+		<ListenWidget audioSrc={audioSrc} />
 
 		<div class="prose">
 			<slot />

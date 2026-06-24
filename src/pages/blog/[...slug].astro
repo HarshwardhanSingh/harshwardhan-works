@@ -15,6 +15,10 @@ const post = Astro.props;
 const { Content, remarkPluginFrontmatter } = await render(post);
 ---
 
-<BlogPost {...post.data} minutesRead={remarkPluginFrontmatter.minutesRead}>
+<BlogPost
+	{...post.data}
+	minutesRead={remarkPluginFrontmatter.minutesRead}
+	audioSrc={`/audio/${post.id}.mp3`}
+>
 	<Content />
 </BlogPost>
