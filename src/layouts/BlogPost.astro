@@ -28,6 +28,10 @@ const {
 } = Astro.props;
 
 const inSeries = slug ? findSeries(slug) : null;
+
+// Audio read-aloud widget temporarily disabled. Flip to true to re-enable
+// (regenerate MP3s first: `npm run audio`).
+const AUDIO_ENABLED = false;
 ---
 
 <BaseLayout
@@ -75,7 +79,7 @@ const inSeries = slug ? findSeries(slug) : null;
 			)
 		}
 
-		<ListenWidget audioSrc={audioSrc} />
+		{AUDIO_ENABLED && <ListenWidget audioSrc={audioSrc} />}
 
 		<div class="prose">
 			<slot />
