@@ -3,10 +3,15 @@ import type { CollectionEntry } from "astro:content";
 import BaseLayout from "./BaseLayout.astro";
 import FormattedDate from "../components/FormattedDate.astro";
 import ListenWidget from "../components/ListenWidget.astro";
+import SeriesNav from "../components/SeriesNav.astro";
+import TableOfContents from "../components/TableOfContents.astro";
+import { findSeries } from "../lib/series";
 
 type Props = CollectionEntry<"blog">["data"] & {
 	minutesRead?: string;
 	audioSrc?: string;
+	slug?: string;
+	headings?: { depth: number; slug: string; text: string }[];
 };
 
 const {
@@ -18,11 +23,29 @@ const {
 	tags,
 	minutesRead,
 	audioSrc,
+	slug,
+	headings = [],
 } = Astro.props;
+
+const inSeries = slug ? findSeries(slug) : null;
 ---
 
-<BaseLayout title={title} description={description} image={heroImage}>
-	<article>
+<BaseLayout
+	title={title}
+	description={description}
+	image={heroImage}
+	width={inSeries ? "var(--maxw-series)" : undefined}
+>
+	<div class:list={["post-layout", { "has-series": !!inSeries }]}>
+		{
+			inSeries && (
+				<aside class="series-rail">
+					<SeriesNav slug={slug!} />
+					<TableOfContents headings={headings} />
+				</aside>
+			)
+		}
+		<article>
 		<header class="post-header">
 			<a href="/blog" class="back">← All writing</a>
 			<h1>{title}</h1>
@@ -57,10 +80,32 @@ const {
 		<div class="prose">
 			<slot />
 		</div>
-	</article>
+		</article>
+	</div>
 </BaseLayout>
 
 <style>
+	/* Two-column layout for posts that belong to a series. Falls back to a
+	   plain single column (no grid) for standalone posts. */
+	.post-layout.has-series {
+		display: grid;
+		grid-template-columns: 13rem minmax(0, 1fr);
+		gap: 2.75rem;
+		align-items: start;
+	}
+	.series-rail {
+		position: sticky;
+		top: 5rem;
+	}
+	@media (max-width: 820px) {
+		.post-layout.has-series {
+			display: block;
+		}
+		.series-rail {
+			position: static;
+			margin-bottom: 2.25rem;
+		}
+	}
 	.post-header {
 		margin-bottom: 2rem;
 	}

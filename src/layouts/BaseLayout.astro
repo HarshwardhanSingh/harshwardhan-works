@@ -10,6 +10,8 @@ interface Props {
 	image?: string;
 	/** Use the wider column (e.g. for listing pages). */
 	wide?: boolean;
+	/** Explicit main width (any CSS value); overrides `wide` when set. */
+	width?: string;
 }
 
 const {
@@ -17,7 +19,10 @@ const {
 	description = SITE_DESCRIPTION,
 	image,
 	wide = false,
+	width,
 } = Astro.props;
+
+const mainWidth = width ?? (wide ? "var(--maxw-wide)" : undefined);
 ---
 
 <!doctype html>
@@ -27,7 +32,7 @@ const {
 	</head>
 	<body>
 		<Header />
-		<main style={wide ? "width: var(--maxw-wide)" : undefined}>
+		<main style={mainWidth ? `width: ${mainWidth}` : undefined}>
 			<slot />
 		</main>
 		<Footer />

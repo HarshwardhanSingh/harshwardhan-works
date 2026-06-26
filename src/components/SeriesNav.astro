@@ -1,0 +1,50 @@
+---
+// Compact series-context header for the left rail: which series this post
+// belongs to and where it sits in the order. Orientation only — the clickable
+// navigation in the rail is the in-page table of contents (see TableOfContents).
+import { findSeries } from "../lib/series";
+
+interface Props {
+	slug: string;
+}
+const { slug } = Astro.props;
+const found = findSeries(slug);
+---
+
+{
+	found && (
+		<div class="series" aria-label={`${found.series.title} series`}>
+			<span class="series__kicker mono">Series</span>
+			<span class="series__title">{found.series.title}</span>
+			<span class="series__progress mono">
+				Part {found.index + 1} of {found.series.posts.length}
+			</span>
+		</div>
+	)
+}
+
+<style>
+	.series {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		padding-bottom: 0.9rem;
+		margin-bottom: 0.9rem;
+		border-bottom: 1px solid var(--border);
+	}
+	.series__kicker {
+		font-size: 0.66rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+	}
+	.series__title {
+		font-size: 0.95rem;
+		font-weight: 600;
+		line-height: 1.25;
+	}
+	.series__progress {
+		font-size: 0.72rem;
+		color: var(--text-muted);
+	}
+</style>

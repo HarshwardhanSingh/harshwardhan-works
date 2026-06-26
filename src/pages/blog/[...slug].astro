@@ -12,13 +12,15 @@ export async function getStaticPaths() {
 type Props = CollectionEntry<"blog">;
 
 const post = Astro.props;
-const { Content, remarkPluginFrontmatter } = await render(post);
+const { Content, headings, remarkPluginFrontmatter } = await render(post);
 ---
 
 <BlogPost
 	{...post.data}
 	minutesRead={remarkPluginFrontmatter.minutesRead}
 	audioSrc={`/audio/${post.id}.mp3`}
+	slug={post.id}
+	headings={headings}
 >
 	<Content />
 </BlogPost>
