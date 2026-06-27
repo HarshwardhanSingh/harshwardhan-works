@@ -81,4 +81,4 @@ Each post in this series ends with a checkpoint commit, so you can check out the
 
 > 📍 **Checkpoint** — `be81193` *(initial commit: infra scaffold — Docker, schema, env)*. A clickable repo link goes here once the source is public.
 
-Next: Chunking, embeddings & the vector DB *(coming soon)*.
+Next: [What is a vector database?](/blog/building-a-cited-rag-vector-databases)

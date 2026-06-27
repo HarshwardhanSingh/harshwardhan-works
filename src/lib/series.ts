@@ -19,7 +19,8 @@ export const SERIES: Series[] = [
 		id: "cited-rag",
 		title: "A welfare-scheme assistant, built to be right",
 		posts: [
-			{ slug: "building-a-cited-rag-1-introduction", label: "Why" },
+			{ slug: "building-a-cited-rag-1-introduction", label: "What we're building, and why" },
+			{ slug: "building-a-cited-rag-vector-databases", label: "What is a vector database?" },
 			{ slug: "building-a-cited-rag-2-chunking-embeddings-vectors", label: "Chunking, embeddings & the vector DB" },
 			{ slug: "building-a-cited-rag-3-retrieval-streaming-citations", label: "Retrieval → a streaming, cited answer" },
 			{ slug: "building-a-cited-rag-4-battle-hardening", label: "Making it battle-hardened" },
