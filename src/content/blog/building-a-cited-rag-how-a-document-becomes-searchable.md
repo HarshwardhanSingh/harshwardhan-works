@@ -183,4 +183,4 @@ A markdown document is now a set of rows in Postgres, each one a vector paired w
 
 > 📍 **Checkpoint** — `0abec3d` *(RAG core: chunk + embed + retrieve)* and `b6774f4` *(DB client, schema, and ingest wiring)*. Clickable repo links to follow once the source is public.
 
-Next: Retrieval → a streaming, cited answer *(coming soon)*.
+Next: [How a question finds its answer](/blog/building-a-cited-rag-how-a-question-finds-its-answer).
