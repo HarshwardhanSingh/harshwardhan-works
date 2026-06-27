@@ -70,4 +70,4 @@ We've got somewhere to store meaning-coordinates and a fast way to search them. 
 
 > 📍 **Checkpoint** — no new code this post. The `vector(1024)` column and HNSW index it describes are already in the schema from part 1 (`be81193`, `docker/initdb/01_schema.sql`).
 
-Next: Chunking, embeddings & the vector DB *(coming soon)*.
+Next: [How a document becomes searchable](/blog/building-a-cited-rag-how-a-document-becomes-searchable).
